@@ -13,6 +13,17 @@ from copy import deepcopy # Added, was used in gradio_demo
 # we might need to add:
 # import sys
 # sys.path.append('src')
+
+import sys
+import os
+# Add the directory containing this script (which is /) to sys.path
+# so that the 'lbm' module (located in /src/lbm) can be found.
+# __file__ is /predict.py, so os.path.dirname(__file__) is /
+# To access /src/lbm, we need to add /src to sys.path.
+# Assuming the script is run from the root of the project,
+# 'src' should be directly accessible.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+
 from lbm.inference import get_model # Still need get_model for LBM
 
 # --- Utility functions (copied from examples/inference/utils.py and adapted) ---
