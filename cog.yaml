@@ -1,0 +1,23 @@
+build:
+  gpu: true
+  python_version: "3.10" # Assuming 3.10, can be adjusted if needed
+  python_packages:
+    - "torch==2.7.0" # From requirements.txt
+    - "torchvision>=0.20.0" # From requirements.txt
+    - "accelerate==1.4.0" # From requirements.txt
+    - "diffusers==0.32.2" # From requirements.txt
+    - "opencv-python==4.9.0.80" # From requirements.txt
+    - "transformers==4.42.3" # From requirements.txt
+    - "kornia==0.8.0" # From requirements.txt
+    - "einops==0.7.0" # From requirements.txt
+    - "Pillow" # For PIL Image operations
+    - "scipy>=1.12.0" # From requirements.txt
+    - "lightning==2.5.0" # From requirements.txt, might be needed by lbm
+    - "peft==0.9.0" # From requirements.txt
+    - "timm==0.9.16" # From requirements.txt
+    # Add any other essential packages that might be implicitly used by lbm.inference
+    # but not directly in the inference script.
+    # For now, this list seems like a good starting point based on requirements.txt
+    # and common usage in such models.
+
+predict: "predict.py:Predictor"
