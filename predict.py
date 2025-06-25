@@ -164,10 +164,10 @@ class Predictor(BasePredictor):
         FLUX parameters for background generation are hardcoded (guidance=30, steps=50, seed=0).
         """
 
-        # FLUX specific parameters (hardcoded as per the Pruna-based example)
-        flux_guidance_scale = 30.0
-        flux_num_inference_steps = 50
-        flux_seed = 0
+        # FLUX specific parameters (experimental change for better blending)
+        flux_guidance_scale = 10.0 # Reduced from 30.0
+        flux_num_inference_steps = 30 # Reduced from 50
+        flux_seed = 0 # Keeping seed consistent for now
 
         generator = torch.Generator(device=self.device).manual_seed(flux_seed)
         print(f"Using FLUX seed: {flux_seed}")
