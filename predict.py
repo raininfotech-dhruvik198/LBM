@@ -1,6 +1,6 @@
 import os
 import torch
-from PIL import Image, ImageOps, ImageChops
+from PIL import Image, ImageOps
 from cog import BasePredictor, Input, Path
 import tempfile
 import numpy as np # Added for array conversion
@@ -8,7 +8,6 @@ from torchvision import transforms # Added for utility functions
 from transformers import AutoModelForImageSegmentation # Added for BiRefNet
 from copy import deepcopy # Added, was used in gradio_demo
 from diffusers import FluxFillPipeline # Added for FLUX.1-Fill
-from diffusers.utils import load_image # Utility for FLUX, though we'll use PIL
 
 # Assuming 'lbm' is in 'src' and 'src' is in PYTHONPATH or added to it.
 # If 'src' is not automatically in PYTHONPATH in the Cog environment,
@@ -17,7 +16,6 @@ from diffusers.utils import load_image # Utility for FLUX, though we'll use PIL
 # sys.path.append('src')
 
 import sys
-import os
 # Add the directory containing this script (which is /) to sys.path
 # so that the 'lbm' module (located in /src/lbm) can be found.
 # __file__ is /predict.py, so os.path.dirname(__file__) is /
@@ -26,7 +24,8 @@ import os
 # 'src' should be directly accessible.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
-from lbm.inference import get_model # Still need get_model for LBM
+from lbm.inference import get_model
+from lbm.inference.utils import resize_and_center_crop
 
 # --- Utility functions (copied from examples/inference/utils.py and adapted) ---
 def extract_object(birefnet_model, img: Image.Image):
@@ -61,32 +60,6 @@ def extract_object(birefnet_model, img: Image.Image):
     # image_composite = Image.composite(img, Image.new("RGB", img.size, (127, 127, 127)), mask.convert('L'))
     return mask # Return only the mask, ensure it's L mode for Image.composite
 
-def resize_and_center_crop(image: Image.Image, target_width: int, target_height: int):
-    original_width, original_height = image.size
-    if original_width == target_width and original_height == target_height:
-        return image
-
-    scale_factor = max(target_width / original_width, target_height / original_height)
-    resized_width = int(round(original_width * scale_factor))
-    resized_height = int(round(original_height * scale_factor))
-
-    resized_image = image.resize((resized_width, resized_height), Image.LANCZOS)
-
-    left = (resized_width - target_width) / 2
-    top = (resized_height - target_height) / 2
-    right = (resized_width + target_width) / 2
-    bottom = (resized_height + target_height) / 2
-
-    cropped_image = resized_image.crop((left, top, right, bottom))
-    return cropped_image
-
-# --- Aspect Ratios (from gradio_demo.py) ---
-ASPECT_RATIOS = {
-    str(512 / 2048): (512, 2048), str(1024 / 1024): (1024, 1024), str(2048 / 512): (2048, 512),
-    str(896 / 1152): (896, 1152), str(1152 / 896): (1152, 896), str(512 / 1920): (512, 1920),
-    str(640 / 1536): (640, 1536), str(768 / 1280): (768, 1280), str(1280 / 768): (1280, 768),
-    str(1536 / 640): (1536, 640), str(1920 / 512): (1920, 512),
-}
 
 # Define a cache directory for models within the Cog environment
 MODEL_CACHE_DIR = "ckpts"
@@ -177,13 +150,10 @@ class Predictor(BasePredictor):
         fg_image_pil = Image.open(str(foreground_image)).convert("RGB")
 
         # --- Logic from gradio_demo.py's evaluate function ---
-        ori_w_fg, ori_h_fg = fg_image_pil.size # Corrected: PIL uses (width, height)
-        ar_fg = ori_h_fg / ori_w_fg # Aspect ratio based on height/width
+        ori_w_fg, ori_h_fg = fg_image_pil.size
 
-        # Find closest aspect ratio for processing dimensions
-        # Note: gradio_demo used fg_image.size for this, which seems more robust
-        closest_ar_key = min(ASPECT_RATIOS.keys(), key=lambda x: abs(float(x) - ar_fg))
-        dimensions_processing = ASPECT_RATIOS[closest_ar_key]
+        target_w = int(round(ori_w_fg / 32)) * 32
+        target_h = int(round(ori_h_fg / 32)) * 32
 
         # Extract foreground mask using BiRefNet
         # The deepcopy was used in gradio, good practice if original fg_image_pil is needed later
@@ -194,8 +164,7 @@ class Predictor(BasePredictor):
 
 
         # Resize and crop images and mask
-        # Target dimensions for processing (h, w)
-        proc_h, proc_w = dimensions_processing # Note: FLUX wants W, H
+        proc_h, proc_w = target_h, target_w
         print(f"Processing dimensions (H, W): ({proc_h}, {proc_w})")
 
         # Resize foreground and its mask for FLUX input
@@ -208,7 +177,7 @@ class Predictor(BasePredictor):
         inverted_fg_mask_for_flux = ImageOps.invert(fg_mask_for_flux.convert('L'))
 
         print("Generating background with FLUX.1-Fill-dev...")
-        # FLUX expects W, H for height and width params, but our dimensions_processing is H, W.
+        # FLUX expects width and height arguments.
         flux_output_image_pil = self.flux_fill_pipe(
             prompt=background_prompt,
             image=fg_image_for_flux, # Image containing the foreground
@@ -258,8 +227,12 @@ class Predictor(BasePredictor):
             # The current resize_and_center_crop handles this by scaling to fill one dimension then cropping the other.
             final_output_image_resized = resize_and_center_crop(final_output_image_processed, output_width, output_height)
         else:
-            print(f"Resizing final output to original foreground dimensions: {ori_w_fg}x{ori_h_fg} using simple resize.")
-            final_output_image_resized = final_output_image_processed.resize((ori_w_fg, ori_h_fg), Image.LANCZOS)
+            print(
+                f"Resizing final output to original foreground dimensions: {ori_w_fg}x{ori_h_fg} using resize_and_center_crop."
+            )
+            final_output_image_resized = resize_and_center_crop(
+                final_output_image_processed, ori_w_fg, ori_h_fg
+            )
 
         # Save the output image
         out_dir = tempfile.mkdtemp()

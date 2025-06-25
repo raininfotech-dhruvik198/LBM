@@ -2,6 +2,7 @@ import logging
 import os
 from typing import List, Optional
 
+import PIL
 import torch
 import yaml
 from diffusers import FlowMatchEulerDiscreteScheduler
@@ -220,3 +221,20 @@ def _get_model_from_config(
     ).to(torch_dtype)
 
     return model
+
+
+def resize_and_center_crop(image, target_width, target_height):
+    """Resize ``image`` maintaining aspect ratio then center-crop to target size."""
+    original_width, original_height = image.size
+    if original_width == target_width and original_height == target_height:
+        return image
+    scale_factor = max(target_width / original_width, target_height / original_height)
+    resized_width = int(round(original_width * scale_factor))
+    resized_height = int(round(original_height * scale_factor))
+    resized_image = image.resize((resized_width, resized_height), PIL.Image.LANCZOS)
+    left = (resized_width - target_width) / 2
+    top = (resized_height - target_height) / 2
+    right = (resized_width + target_width) / 2
+    bottom = (resized_height + target_height) / 2
+    return resized_image.crop((left, top, right, bottom))
+
