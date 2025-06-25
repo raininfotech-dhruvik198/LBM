@@ -5,23 +5,11 @@ import torch
 from torchvision.transforms import ToPILImage, ToTensor
 
 from lbm.models.lbm import LBMModel
+from lbm.inference.utils import resize_and_center_crop
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ASPECT_RATIOS = {
-    str(512 / 2048): (512, 2048),
-    str(1024 / 1024): (1024, 1024),
-    str(2048 / 512): (2048, 512),
-    str(896 / 1152): (896, 1152),
-    str(1152 / 896): (1152, 896),
-    str(512 / 1920): (512, 1920),
-    str(640 / 1536): (640, 1536),
-    str(768 / 1280): (768, 1280),
-    str(1280 / 768): (1280, 768),
-    str(1536 / 640): (1536, 640),
-    str(1920 / 512): (1920, 512),
-}
 
 
 @torch.no_grad()
@@ -42,12 +30,12 @@ def evaluate(
         PIL.Image.Image: The generated image.
     """
 
-    ori_h_bg, ori_w_bg = source_image.size
-    ar_bg = ori_h_bg / ori_w_bg
-    closest_ar_bg = min(ASPECT_RATIOS, key=lambda x: abs(float(x) - ar_bg))
-    source_dimensions = ASPECT_RATIOS[closest_ar_bg]
+    ori_w, ori_h = source_image.size
 
-    source_image = source_image.resize(source_dimensions)
+    target_w = int(round(ori_w / 32)) * 32
+    target_h = int(round(ori_h / 32)) * 32
+
+    source_image = resize_and_center_crop(source_image, target_w, target_h)
 
     img_pasted_tensor = ToTensor()(source_image).unsqueeze(0) * 2 - 1
     batch = {
@@ -65,6 +53,6 @@ def evaluate(
 
     output_image = (output_image[0].float().cpu() + 1) / 2
     output_image = ToPILImage()(output_image)
-    output_image.resize((ori_h_bg, ori_w_bg))
+    output_image = resize_and_center_crop(output_image, ori_w, ori_h)
 
     return output_image

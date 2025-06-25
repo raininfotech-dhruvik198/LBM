@@ -130,6 +130,10 @@ python examples/inference/inference.py \
 --output_path output_images
 ```
 
+The script automatically resizes the input image to the nearest multiple of 32
+using a center crop so that it matches the model requirements. After sampling,
+the prediction is scaled back to the original resolution.
+
 See the trained models on the HF Hub 🤗
 - [Surface normals Checkpoint](https://huggingface.co/jasperai/LBM_normals)
 - [Depth Checkpoint](https://huggingface.co/jasperai/LBM_depth)
