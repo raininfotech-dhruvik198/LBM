@@ -134,7 +134,7 @@ class Predictor(BasePredictor):
         print("Loading FLUX.1-Fill-dev model...")
         try:
             self.flux_fill_pipe = FluxFillPipeline.from_pretrained(
-                "black-forest-labs/FLUX.1-Fill-dev",
+                "fuliucansheng/FLUX.1-Fill-dev",
                 torch_dtype=torch.bfloat16,
                 cache_dir=flux_model_cache_path
             ).to(self.device)
